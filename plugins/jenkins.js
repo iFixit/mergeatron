@@ -9,6 +9,7 @@ exports.init = function(config, mergeatron) {
 			var run_jenkins = function() {
 				mergeatron.mongo.jobs.find({ status: { $ne: 'finished' } }).forEach(function(err, item) {
 					if (err) {
+						console.log(err);
 						process.exit(1);
 					}
 
@@ -73,9 +74,7 @@ exports.init = function(config, mergeatron) {
 			}
 
 			mergeatron.mongo.pulls.update({ _id: number }, { $set: { head: sha, updated_at: updated_at } });
-			mergeatron.mongo.jobs.insert({ _id: job_id, pull: number, status: 'new' });
-
-			checkJob(job_id);
+			mergeatron.mongo.jobs.insert({ _id: job_id, pull: number, status: 'new', head: sha });
 		});
 	}
 
@@ -110,15 +109,46 @@ exports.init = function(config, mergeatron) {
 								if (build['result'] == 'FAILURE') {
 									mergeatron.mongo.jobs.update({ _id: job_id }, { $set: { status: 'finished' } });
 									mergeatron.emit('build_failed', job_id, job['pull'], build['url'] + 'console');
+
+									processArtifacts(build, job);
 								} else if (build['result'] == 'SUCCESS') {
 									mergeatron.mongo.jobs.update({ _id: job_id }, { $set: { status: 'finished' } });
 									mergeatron.emit('build_succeeded', job_id, job['pull'], build['url']);
+
+									processArtifacts(build, job);
 								}
 							}
 						});
 					}
 				});
 			});
+		});
+	}
+
+	function processArtifacts(build, job) {
+		var options = {
+			url: url.format({
+				protocol: config.protocol,
+				host: config.host,
+				pathname: '/job/' + config.project + '/' + build['number'] + '/api/json',
+				query: {
+					tree: 'artifacts[fileName,relativePath]'
+				},
+			}),
+			json: true
+		};
+
+		request(options, function(err, response) {
+			if (err) {
+				console.log(err);
+				return;
+			}
+
+			var artifacts = response.body.artifacts;
+			for (var i in artifacts) {
+				artifacts[i]['url'] = build['url'] + 'artifact/' + artifacts[i]['relative_url'];
+				mergeatron.emit('artifact_found', build, job, artifacts[i]);
+			}
 		});
 	}
 };
