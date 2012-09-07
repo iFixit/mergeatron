@@ -46,16 +46,16 @@ exports.init = function(config, mergeatron) {
 		processPull(pull);
 	});
 
-	mergeatron.on('build_started', function(job_id, pull_number, build_url) {
-		comment(pull_number, 'Testing Pull Request\nBuild: ' + build_url);
+	mergeatron.on('build_started', function(job, pull, build_url) {
+		comment(pull.number, 'Testing Pull Request\nBuild: ' + build_url);
 	});
 
-	mergeatron.on('build_failed', function(job_id, pull_number, build_url) {
-		comment(pull_number,  responses.failure.randomValue() + "\n" + build_url);
+	mergeatron.on('build_failed', function(job, pull, build_url) {
+		comment(pull.number,  responses.failure.randomValue() + "\n" + build_url);
 	});
 
-	mergeatron.on('build_succeeded', function(job_id, pull_number, build_url) {
-		comment(pull_number, responses.success.randomValue());
+	mergeatron.on('build_succeeded', function(job, pull, build_url) {
+		comment(pull.number, responses.success.randomValue());
 	});
 
 	mergeatron.on('line_violation', function(job_id, pull_number, sha, file, position) {
@@ -77,18 +77,18 @@ exports.init = function(config, mergeatron) {
 				return;
 			}
 
-			var file_names = [];
+			pull.files = [];
 			for (var x in files) {
 				var file_name = files[x].filename;
 				if (!file_name || file_name == 'undefined') {
 					continue;
 				}
 
-				file_names.push(file_name);
+				pull.files.push(files[x]);
 			}
 
-			if (file_names.length > 0) {
-				mergeatron.emit('build_check_files', pull, file_names);
+			if (pull.files.length > 0) {
+				mergeatron.emit('build_check_files', pull);
 			}
 		});
 	}
@@ -101,23 +101,27 @@ exports.init = function(config, mergeatron) {
 
 			if (!item) {
 				new_pull = true;
-				mergeatron.mongo.pulls.insert({ _id: pull.number, created_at: pull.created_at, updated_at: pull.updated_at, head: pull.head.sha }, function(err) {
+				mergeatron.mongo.pulls.insert({ _id: pull.number, number: pull.number, created_at: pull.created_at, updated_at: pull.updated_at, head: pull.head.sha, files: pull.files }, function(err) {
 					if (err) {
 						console.log(err);
 						process.exit(1);
 					}
 				});
+			} else {
+				mergeatron.mongo.pulls.update({ _id: pull.number }, { $set: { files: pull.files } });
 			}
 
+			pull.jobs = item.jobs || [];
+
 			if (new_pull || pull.head.sha != item.head) {
-				mergeatron.emit('build_triggered', pull.number, pull.head.sha, ssh_url, branch, pull.updated_at);
+				mergeatron.emit('build_triggered', pull, pull.number, pull.head.sha, ssh_url, branch, pull.updated_at);
 				return;
 			}
 
 			GitHub.issues.getComments({ user: config.user, repo: config.repo, number: pull.number, per_page: 100 }, function(error, resp) {
 				for (i in resp) {
 					if (resp[i].created_at > item.updated_at && resp[i].body.indexOf('@' + config.auth.user + ' retest') != -1) {
-						mergeatron.emit('build_triggered', pull.number, pull.head.sha, ssh_url, branch, pull.updated_at, resp[i].user.login);
+						mergeatron.emit('build_triggered', pull, pull.number, pull.head.sha, ssh_url, branch, pull.updated_at, resp[i].user.login);
 						return;
 					}
 				}
