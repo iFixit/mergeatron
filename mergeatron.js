@@ -1,10 +1,13 @@
 var config = require('./config').config,
+   Queue = require('./lib/queue'),
 	//mongo = require('mongojs').connect(config.mongo, ['builds']),
 	//fs = require('fs'),
 	events = require('events');
 
 var Mergeatron = function(mongo) {
 	this.mongo = mongo;
+   this.builds = new Queue();
+   this.completedBuild = new Queue();
 };
 
 Mergeatron.prototype = new events.EventEmitter;

@@ -23,5 +23,7 @@
 		"async" : ">=0.1.22"
 	},
 
-	"main": "./mergeatron.js"
+	"main": "./mergeatron.js",
+
+	"scripts": { "test": "expresso test/test.js" }
 }

@@ -10,6 +10,7 @@ exports.init = function(config, mergeatron) {
 	});
 
 
+   /*
 	async.parallel({
 		'github': function() {
 			var run_github = function() {
@@ -172,49 +173,59 @@ exports.init = function(config, mergeatron) {
 			});
 		});
 	}
+   */
 
 	function createStatus(sha, state, build_url, description) {
 		GitHub.statuses.create({ user: config.user, repo: config.repo, sha: sha, state: state, target_url: build_url, description: description });
 	}
-};
 
-var http = require('http');
+   var http = require('http');
 
-var whitelist = [
-    '207.97.227.253', // GitHub #1
-    '50.57.128.197', // GitHub #2
-    '108.171.174.178' // GitHub #3
-];
+   var whitelist = [
+       '207.97.227.253', // GitHub #1
+       '50.57.128.197', // GitHub #2
+       '108.171.174.178' // GitHub #3
+   ];
 
-var server = http.createServer(function(request, response) {
-    // Check against whitelist.
-    if (whitelist.indexOf(request.connection.remoteAddress) < 0) {
-        response.writeHead(403, 'Access denied.');
-        response.end();
-        console.warn('Access denied for client ' + request.connection.remoteAddress);
-        return;
-    }
+   var server = http.createServer(function(request, response) {
+       // Check against whitelist.
+       if (whitelist.indexOf(request.connection.remoteAddress) < 0) {
+           response.writeHead(403, 'Access denied.');
+           response.end();
+           console.warn('Access denied for client ' + request.connection.remoteAddress);
+           return;
+       }
 
-    var body = '';
-    request.setEncoding('utf8');
-    request.on('data', function(chunk) {
-        body += chunk;
-    });
-    request.on('end', function() {
-        // Decode, get rid of "payload=", and unpack.
-        var info = JSON.parse(decodeURIComponent(body).substring(8));
+       var body = '';
+       request.setEncoding('utf8');
+       request.on('data', function(chunk) {
+           body += chunk;
+       });
 
-        var pusher = info.pusher.name;
-        // ref: "refs/heads/master"
-        var branch = info.ref.match(/\/([^\/]+)$/)[1];
+       request.on('end', function() {
+           // Decode, get rid of "payload=", and unpack.
+           var info = JSON.parse(decodeURIComponent(body).substring(8));
 
-        mergeatron.emit('head_found', new Commit(
-        response.end();
-    });
-}).listen(config.port);
+           // ref: "refs/heads/master"
+           var branch = info.ref.split('/').pop();
 
+           var build = {
+              repo: info.repository.url,
+              sha: info.after,
+              branch: branch,
+              status: 'began'
+           };
+           mergeatron.builds.push(build);
+           mergeatron.builds.push(build);
+           response.end();
+       });
+   }).listen(config.port);
+
+/*
 {
    sha: "32313462346234532",
    repo: "http://github.com/ifixit/test-repo"
-   status:
+   status: null,'began','failed','success'
 }
+*/
+};
