@@ -1,6 +1,6 @@
 var config = require('./config').config,
-	mongo = require('mongojs').connect(config.mongo, ['pulls', 'jobs']),
-	fs = require('fs'),
+	//mongo = require('mongojs').connect(config.mongo, ['builds']),
+	//fs = require('fs'),
 	events = require('events');
 
 var Mergeatron = function(mongo) {
@@ -8,7 +8,7 @@ var Mergeatron = function(mongo) {
 };
 
 Mergeatron.prototype = new events.EventEmitter;
-mergeatron = new Mergeatron(mongo);
+mergeatron = new Mergeatron();
 
 config.plugin_dirs.forEach(function(dir) {
 	fs.readdir(dir, function(err, files) {

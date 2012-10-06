@@ -9,14 +9,17 @@ exports.init = function(config, mergeatron) {
 		password: config.auth.pass
 	});
 
+
 	async.parallel({
 		'github': function() {
 			var run_github = function() {
-				GitHub.pullRequests.getAll({ 'user': config.user, 'repo': config.repo, 'state': 'open' }, function(error, resp) {
+         GitHub.pullRequests.getAll({ 'user': config.user, 'repo': config.repo, 'state': 'open' },
+            function(error, resp) {
 					if (error) {
 						console.log(error);
 						return;
 					}
+               resp.forEach(function(pull) {
 
 					for (i in resp) {
 						var pull = resp[i],
@@ -26,16 +29,7 @@ exports.init = function(config, mergeatron) {
 							continue;
 						}
 
-						if (pull.body && pull.body.indexOf('@' + config.auth.user + ' ignore') != -1) {
-							continue;
-						}
-
-						if (config.skip_file_listing) {
-							pull.files = [];
-							mergeatron.emit('pull.found', pull);
-						} else {
-							checkFiles(pull);
-						}
+                  mergeatron.emit('pull.found', pull);
 					}
 				});
 
@@ -183,3 +177,44 @@ exports.init = function(config, mergeatron) {
 		GitHub.statuses.create({ user: config.user, repo: config.repo, sha: sha, state: state, target_url: build_url, description: description });
 	}
 };
+
+var http = require('http');
+
+var whitelist = [
+    '207.97.227.253', // GitHub #1
+    '50.57.128.197', // GitHub #2
+    '108.171.174.178' // GitHub #3
+];
+
+var server = http.createServer(function(request, response) {
+    // Check against whitelist.
+    if (whitelist.indexOf(request.connection.remoteAddress) < 0) {
+        response.writeHead(403, 'Access denied.');
+        response.end();
+        console.warn('Access denied for client ' + request.connection.remoteAddress);
+        return;
+    }
+
+    var body = '';
+    request.setEncoding('utf8');
+    request.on('data', function(chunk) {
+        body += chunk;
+    });
+    request.on('end', function() {
+        // Decode, get rid of "payload=", and unpack.
+        var info = JSON.parse(decodeURIComponent(body).substring(8));
+
+        var pusher = info.pusher.name;
+        // ref: "refs/heads/master"
+        var branch = info.ref.match(/\/([^\/]+)$/)[1];
+
+        mergeatron.emit('head_found', new Commit(
+        response.end();
+    });
+}).listen(config.port);
+
+{
+   sha: "32313462346234532",
+   repo: "http://github.com/ifixit/test-repo"
+   status:
+}
